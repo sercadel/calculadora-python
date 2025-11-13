@@ -1,67 +1,165 @@
 import tkinter as tk
+from tkinter import font
 
-class Calculadora:
+class CalculadoraModern:
     def __init__(self, root):
         self.root = root
-        self.root.title("Calculadora Avanzada")
-        self.root.geometry("350x450")
+        self.root.title("Calculadora")
+        self.root.geometry("350x500")
+        self.root.resizable(False, False)
+        self.root.configure(bg='#000000')
         
         # Variables de estado
         self.operacion = ""
-        self.resultado = 0
         self.ultima_operacion = ""
         self.nuevo_numero = True
         self.operacion_pendiente = False
+        self.texto_display = "0"  # Variable para almacenar el texto del display
         
-        # Crear interfaz
+        # Configurar fuentes
+        self.fuente_numeros = font.Font(family="Helvetica", size=24)
+        self.fuente_display = font.Font(family="Helvetica", size=32)
+        
+        # Colores (tema oscuro tipo iOS)
+        self.colores = {
+            'fondo': '#000000',
+            'display': '#000000',
+            'texto_display': '#FFFFFF',
+            'numero': '#333333',
+            'operador': '#FF9500',
+            'funcion': '#A5A5A5',
+            'texto_funcion': '#000000',
+            'texto_operador': '#FFFFFF',
+            'texto_numero': '#FFFFFF'
+        }
+        
         self.crear_interfaz()
     
     def crear_interfaz(self):
-        # Pantalla
-        self.pantalla = tk.Entry(
-            self.root, 
-            font=('Arial', 20), 
-            justify='right',
-            bd=10,
-            relief=tk.RIDGE
-        )
-        self.pantalla.grid(row=0, column=0, columnspan=4, padx=10, pady=10, ipadx=8, ipady=8)
-        self.pantalla.insert(0, "0")
+        # Display
+        self.crear_display()
         
-        # Botones - diseño mejorado
+        # Botones
+        self.crear_botones()
+    
+    def crear_display(self):
+        # Frame del display con borde redondeado visual
+        display_frame = tk.Frame(self.root, bg=self.colores['fondo'])
+        display_frame.pack(expand=True, fill='both', padx=10, pady=20)
+        
+        # Usar un Label en lugar de Entry para mejor control visual
+        self.pantalla = tk.Label(
+            display_frame,
+            text=self.texto_display,
+            font=self.fuente_display,
+            bg=self.colores['display'],
+            fg=self.colores['texto_display'],
+            anchor='e',
+            padx=20,
+            relief='flat',
+            bd=1,
+            highlightbackground='#333333',  # Borde gris oscuro sutil
+            highlightthickness=1
+        )
+        self.pantalla.pack(expand=True, fill='both')
+    
+    def crear_botones(self):
+        # Frame principal de botones
+        botones_frame = tk.Frame(self.root, bg=self.colores['fondo'])
+        botones_frame.pack(expand=True, fill='both', padx=10, pady=10)
+        
+        # Configurar grid para que sea flexible
+        for i in range(5):  # 5 filas
+            botones_frame.grid_rowconfigure(i, weight=1)
+        for j in range(4):  # 4 columnas
+            botones_frame.grid_columnconfigure(j, weight=1)
+        
+        # Definición de botones en grid
         botones = [
-            ('C', 1, 0), ('±', 1, 1), ('%', 1, 2), ('÷', 1, 3),
-            ('7', 2, 0), ('8', 2, 1), ('9', 2, 2), ('×', 2, 3),
-            ('4', 3, 0), ('5', 3, 1), ('6', 3, 2), ('-', 3, 3),
-            ('1', 4, 0), ('2', 4, 1), ('3', 4, 2), ('+', 4, 3),
-            ('0', 5, 0, 2), ('.', 5, 2), ('=', 5, 3)
+            ['C', '±', '%', '÷'],
+            ['7', '8', '9', '×'],
+            ['4', '5', '6', '-'],
+            ['1', '2', '3', '+'],
+            ['0', '.', '=']
         ]
         
         # Crear botones
-        for boton in botones:
-            texto = boton[0]
-            fila = boton[1]
-            columna = boton[2]
-            
-            if texto == '0' and len(boton) > 3:
-                colspan = boton[3]
-                tk.Button(
-                    self.root, 
-                    text=texto, 
-                    font=('Arial', 14),
-                    width=11,
-                    height=2,
-                    command=lambda x=texto: self.click(x)
-                ).grid(row=fila, column=columna, columnspan=colspan, padx=2, pady=2)
-            else:
-                tk.Button(
-                    self.root, 
-                    text=texto, 
-                    font=('Arial', 14),
-                    width=5,
-                    height=2,
-                    command=lambda x=texto: self.click(x)
-                ).grid(row=fila, column=columna, padx=2, pady=2)
+        for i, fila in enumerate(botones):
+            for j, texto in enumerate(fila):
+                if texto == '':  # Skip empty cells
+                    continue
+                    
+                # Determinar tipo de botón y colores
+                if texto in ['C', '±', '%']:
+                    bg_color = self.colores['funcion']
+                    fg_color = self.colores['texto_funcion']
+                elif texto in ['÷', '×', '-', '+', '=']:
+                    bg_color = self.colores['operador']
+                    fg_color = self.colores['texto_operador']
+                else:
+                    bg_color = self.colores['numero']
+                    fg_color = self.colores['texto_numero']
+                
+                # Manejo especial para el botón 0 en la última fila
+                if i == 4 and texto == '0':
+                    # El 0 ocupa 2 columnas y está alineado con 1 y 2
+                    btn = tk.Button(
+                        botones_frame,
+                        text=texto,
+                        font=self.fuente_numeros,
+                        bg=bg_color,
+                        fg=fg_color,
+                        bd=0,
+                        relief='flat',
+                        command=lambda x=texto: self.click(x)
+                    )
+                    btn.grid(row=i, column=0, columnspan=2, sticky='nsew', padx=2, pady=2)
+                
+                # Para . y = en la última fila
+                elif i == 4 and texto == '.':
+                    btn = tk.Button(
+                        botones_frame,
+                        text=texto,
+                        font=self.fuente_numeros,
+                        bg=bg_color,
+                        fg=fg_color,
+                        bd=0,
+                        relief='flat',
+                        command=lambda x=texto: self.click(x)
+                    )
+                    btn.grid(row=i, column=2, sticky='nsew', padx=2, pady=2)
+                
+                elif i == 4 and texto == '=':
+                    btn = tk.Button(
+                        botones_frame,
+                        text=texto,
+                        font=self.fuente_numeros,
+                        bg=bg_color,
+                        fg=fg_color,
+                        bd=0,
+                        relief='flat',
+                        command=lambda x=texto: self.click(x)
+                    )
+                    btn.grid(row=i, column=3, sticky='nsew', padx=2, pady=2)
+                
+                # Para todas las demás filas
+                else:
+                    btn = tk.Button(
+                        botones_frame,
+                        text=texto,
+                        font=self.fuente_numeros,
+                        bg=bg_color,
+                        fg=fg_color,
+                        bd=0,
+                        relief='flat',
+                        command=lambda x=texto: self.click(x)
+                    )
+                    btn.grid(row=i, column=j, sticky='nsew', padx=2, pady=2)
+    
+    def actualizar_display(self, texto):
+        """Actualizar el display usando Label en lugar de Entry"""
+        self.texto_display = texto
+        self.pantalla.config(text=texto)
     
     def click(self, caracter):
         if caracter == '=':
@@ -78,16 +176,18 @@ class Calculadora:
             self.agregar_numero(caracter)
     
     def agregar_numero(self, numero):
-        actual = self.pantalla.get()
+        actual = self.texto_display
         
         if self.nuevo_numero or actual == "0":
-            self.pantalla.delete(0, tk.END)
+            self.actualizar_display("")
             self.nuevo_numero = False
         
-        if numero == '.' and '.' in self.pantalla.get():
+        # Evitar múltiples puntos decimales
+        if numero == '.' and '.' in self.texto_display:
             return
             
-        self.pantalla.insert(tk.END, numero)
+        nuevo_texto = self.texto_display + numero
+        self.actualizar_display(nuevo_texto)
         self.operacion_pendiente = False
     
     def agregar_operacion(self, operador):
@@ -95,7 +195,7 @@ class Calculadora:
             if self.operacion_pendiente and not self.nuevo_numero:
                 self.calcular_resultado()
             
-            self.operacion = self.pantalla.get()
+            self.operacion = self.texto_display
             self.ultima_operacion = operador
             self.nuevo_numero = True
             self.operacion_pendiente = True
@@ -108,7 +208,7 @@ class Calculadora:
             if not self.ultima_operacion or self.nuevo_numero:
                 return
             
-            segundo_numero = self.pantalla.get()
+            segundo_numero = self.texto_display
             num1 = float(self.operacion)
             num2 = float(segundo_numero)
             resultado = 0
@@ -121,17 +221,20 @@ class Calculadora:
                 resultado = num1 * num2
             elif self.ultima_operacion == '÷':
                 if num2 == 0:
-                    self.pantalla.delete(0, tk.END)
-                    self.pantalla.insert(0, "Error: Div/0")
+                    self.actualizar_display("Error")
                     return
                 resultado = num1 / num2
             
-            # Mostrar resultado
-            self.pantalla.delete(0, tk.END)
+            # Formatear resultado (eliminar .0 si es entero)
             if resultado.is_integer():
-                self.pantalla.insert(0, str(int(resultado)))
+                texto_resultado = str(int(resultado))
             else:
-                self.pantalla.insert(0, str(round(resultado, 8)))
+                texto_resultado = str(round(resultado, 8))
+                # Eliminar ceros decimales innecesarios
+                if '.' in texto_resultado:
+                    texto_resultado = texto_resultado.rstrip('0').rstrip('.')
+            
+            self.actualizar_display(texto_resultado)
             
             # Resetear estado
             self.operacion = ""
@@ -144,36 +247,32 @@ class Calculadora:
     
     def cambiar_signo(self):
         try:
-            actual = self.pantalla.get()
-            if actual and actual != "0":
+            actual = self.texto_display
+            if actual and actual != "0" and actual != "Error":
                 valor = float(actual)
-                self.pantalla.delete(0, tk.END)
-                self.pantalla.insert(0, str(-valor))
+                self.actualizar_display(str(-valor))
         except:
             self.mostrar_error()
     
     def porcentaje(self):
         try:
-            actual = float(self.pantalla.get())
-            self.pantalla.delete(0, tk.END)
-            self.pantalla.insert(0, str(actual / 100))
+            actual = float(self.texto_display)
+            self.actualizar_display(str(actual / 100))
         except:
             self.mostrar_error()
     
     def limpiar(self):
-        self.pantalla.delete(0, tk.END)
-        self.pantalla.insert(0, "0")
+        self.actualizar_display("0")
         self.operacion = ""
         self.ultima_operacion = ""
         self.nuevo_numero = True
         self.operacion_pendiente = False
     
     def mostrar_error(self):
-        self.pantalla.delete(0, tk.END)
-        self.pantalla.insert(0, "Error")
+        self.actualizar_display("Error")
         self.nuevo_numero = True
 
 if __name__ == "__main__":
     root = tk.Tk()
-    calc = Calculadora(root)
+    app = CalculadoraModern(root)
     root.mainloop()
