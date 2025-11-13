@@ -1,1 +1,9 @@
-tkinter
+# Calculadora Python - Requerimientos
+# Nota: Tkinter viene incluido con Python, no necesita instalación
+
+python>=3.6
+
+# Este proyecto usa únicamente módulos estándar de Python:
+# - tkinter (interfaz gráfica)
+# - json (persistencia de datos)
+# - os (operaciones del sistema)
