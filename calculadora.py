@@ -1,11 +1,13 @@
 import tkinter as tk
-from tkinter import font
+from tkinter import font, messagebox
+import json
+import os
 
 class CalculadoraModern:
     def __init__(self, root):
         self.root = root
-        self.root.title("Calculadora")
-        self.root.geometry("350x500")
+        self.root.title("Calculadora Avanzada")
+        self.root.geometry("400x600")
         self.root.resizable(False, False)
         self.root.configure(bg='#000000')
         
@@ -14,11 +16,20 @@ class CalculadoraModern:
         self.ultima_operacion = ""
         self.nuevo_numero = True
         self.operacion_pendiente = False
-        self.texto_display = "0"  # Variable para almacenar el texto del display
+        self.texto_display = "0"
+        
+        # Memoria
+        self.memoria = 0
+        self.memoria_activa = False
+        
+        # Historial
+        self.historial = []
+        self.max_historial = 10
         
         # Configurar fuentes
-        self.fuente_numeros = font.Font(family="Helvetica", size=24)
-        self.fuente_display = font.Font(family="Helvetica", size=32)
+        self.fuente_numeros = font.Font(family="Helvetica", size=20)
+        self.fuente_display = font.Font(family="Helvetica", size=28)
+        self.fuente_pequena = font.Font(family="Helvetica", size=12)
         
         # Colores (tema oscuro tipo iOS)
         self.colores = {
@@ -28,26 +39,34 @@ class CalculadoraModern:
             'numero': '#333333',
             'operador': '#FF9500',
             'funcion': '#A5A5A5',
+            'memoria': '#4A90E2',
+            'historial': '#34C759',
             'texto_funcion': '#000000',
             'texto_operador': '#FFFFFF',
-            'texto_numero': '#FFFFFF'
+            'texto_numero': '#FFFFFF',
+            'texto_memoria': '#FFFFFF',
+            'borde_display': '#333333'
         }
         
+        self.cargar_historial()
         self.crear_interfaz()
     
     def crear_interfaz(self):
-        # Display
+        # Display principal
         self.crear_display()
+        
+        # Display de memoria
+        self.crear_display_memoria()
         
         # Botones
         self.crear_botones()
     
     def crear_display(self):
-        # Frame del display con borde redondeado visual
+        # Frame del display
         display_frame = tk.Frame(self.root, bg=self.colores['fondo'])
-        display_frame.pack(expand=True, fill='both', padx=10, pady=20)
+        display_frame.pack(expand=True, fill='both', padx=10, pady=(20, 5))
         
-        # Usar un Label en lugar de Entry para mejor control visual
+        # Display principal con borde sutil
         self.pantalla = tk.Label(
             display_frame,
             text=self.texto_display,
@@ -56,12 +75,39 @@ class CalculadoraModern:
             fg=self.colores['texto_display'],
             anchor='e',
             padx=20,
-            relief='flat',
+            relief='solid',
             bd=1,
-            highlightbackground='#333333',  # Borde gris oscuro sutil
+            highlightbackground=self.colores['borde_display'],
             highlightthickness=1
         )
         self.pantalla.pack(expand=True, fill='both')
+    
+    def crear_display_memoria(self):
+        # Frame para información de memoria
+        memoria_frame = tk.Frame(self.root, bg=self.colores['fondo'])
+        memoria_frame.pack(fill='x', padx=10, pady=5)
+        
+        # Indicador de memoria
+        self.memoria_label = tk.Label(
+            memoria_frame,
+            text="M: 0",
+            font=self.fuente_pequena,
+            bg=self.colores['fondo'],
+            fg=self.colores['memoria'],
+            anchor='w'
+        )
+        self.memoria_label.pack(side='left')
+        
+        # Contador de historial
+        self.historial_label = tk.Label(
+            memoria_frame,
+            text=f"Historial: {len(self.historial)}",
+            font=self.fuente_pequena,
+            bg=self.colores['fondo'],
+            fg=self.colores['historial'],
+            anchor='e'
+        )
+        self.historial_label.pack(side='right')
     
     def crear_botones(self):
         # Frame principal de botones
@@ -69,18 +115,27 @@ class CalculadoraModern:
         botones_frame.pack(expand=True, fill='both', padx=10, pady=10)
         
         # Configurar grid para que sea flexible
-        for i in range(5):  # 5 filas
+        for i in range(7):  # 7 filas
             botones_frame.grid_rowconfigure(i, weight=1)
         for j in range(4):  # 4 columnas
             botones_frame.grid_columnconfigure(j, weight=1)
         
-        # Definición de botones en grid
+        # DEFINICIÓN CORREGIDA DE BOTONES - EL BOTÓN "=" DEBE ESTAR VISIBLE
         botones = [
-            ['C', '±', '%', '÷'],
-            ['7', '8', '9', '×'],
-            ['4', '5', '6', '-'],
-            ['1', '2', '3', '+'],
-            ['0', '.', '=']
+            # Fila 0: Memoria
+            ['MC', 'MR', 'M+', 'M-'],
+            # Fila 1: Funciones especiales
+            ['MS', 'C', '±', '%'],
+            # Fila 2: Números y operadores
+            ['7', '8', '9', '÷'],
+            # Fila 3: Números y operadores
+            ['4', '5', '6', '×'],
+            # Fila 4: Números y operadores
+            ['1', '2', '3', '-'],
+            # Fila 5: Números y operadores - CORREGIDA
+            ['0', '', '.', '+'],  # Cambiamos el orden
+            # Fila 6: Botones finales - AQUÍ ESTÁ EL "="
+            ['', '', 'HIST', '=']   # El "=" en la última fila, columna 3
         ]
         
         # Crear botones
@@ -90,7 +145,13 @@ class CalculadoraModern:
                     continue
                     
                 # Determinar tipo de botón y colores
-                if texto in ['C', '±', '%']:
+                if texto in ['MC', 'MR', 'M+', 'M-', 'MS']:
+                    bg_color = self.colores['memoria']
+                    fg_color = self.colores['texto_memoria']
+                elif texto == 'HIST':
+                    bg_color = self.colores['historial']
+                    fg_color = self.colores['texto_memoria']
+                elif texto in ['C', '±', '%']:
                     bg_color = self.colores['funcion']
                     fg_color = self.colores['texto_funcion']
                 elif texto in ['÷', '×', '-', '+', '=']:
@@ -100,9 +161,9 @@ class CalculadoraModern:
                     bg_color = self.colores['numero']
                     fg_color = self.colores['texto_numero']
                 
-                # Manejo especial para el botón 0 en la última fila
-                if i == 4 and texto == '0':
-                    # El 0 ocupa 2 columnas y está alineado con 1 y 2
+                # Manejo especial para botones específicos
+                if i == 5 and texto == '0':
+                    # El 0 ocupa 2 columnas en la fila 5
                     btn = tk.Button(
                         botones_frame,
                         text=texto,
@@ -115,8 +176,7 @@ class CalculadoraModern:
                     )
                     btn.grid(row=i, column=0, columnspan=2, sticky='nsew', padx=2, pady=2)
                 
-                # Para . y = en la última fila
-                elif i == 4 and texto == '.':
+                elif i == 5 and texto == '.':
                     btn = tk.Button(
                         botones_frame,
                         text=texto,
@@ -129,7 +189,7 @@ class CalculadoraModern:
                     )
                     btn.grid(row=i, column=2, sticky='nsew', padx=2, pady=2)
                 
-                elif i == 4 and texto == '=':
+                elif i == 5 and texto == '+':
                     btn = tk.Button(
                         botones_frame,
                         text=texto,
@@ -141,6 +201,34 @@ class CalculadoraModern:
                         command=lambda x=texto: self.click(x)
                     )
                     btn.grid(row=i, column=3, sticky='nsew', padx=2, pady=2)
+                
+                # Para el botón "=" en la fila 6
+                elif i == 6 and texto == '=':
+                    btn = tk.Button(
+                        botones_frame,
+                        text=texto,
+                        font=self.fuente_numeros,
+                        bg=bg_color,
+                        fg=fg_color,
+                        bd=0,
+                        relief='flat',
+                        command=lambda x=texto: self.click(x)
+                    )
+                    btn.grid(row=i, column=2, columnspan=2, sticky='nsew', padx=2, pady=2)
+                
+                # Para el botón HIST en la fila 6
+                elif i == 6 and texto == 'HIST':
+                    btn = tk.Button(
+                        botones_frame,
+                        text="📋 HISTORIAL",
+                        font=('Helvetica', 14),
+                        bg=bg_color,
+                        fg=fg_color,
+                        bd=0,
+                        relief='flat',
+                        command=self.mostrar_historial
+                    )
+                    btn.grid(row=i, column=0, columnspan=2, sticky='nsew', padx=2, pady=2)
                 
                 # Para todas las demás filas
                 else:
@@ -157,9 +245,18 @@ class CalculadoraModern:
                     btn.grid(row=i, column=j, sticky='nsew', padx=2, pady=2)
     
     def actualizar_display(self, texto):
-        """Actualizar el display usando Label en lugar de Entry"""
+        """Actualizar el display"""
         self.texto_display = texto
         self.pantalla.config(text=texto)
+    
+    def actualizar_memoria_display(self):
+        """Actualizar el display de memoria"""
+        if self.memoria_activa:
+            self.memoria_label.config(text=f"M: {self.memoria}", fg='#FFD700')
+        else:
+            self.memoria_label.config(text=f"M: {self.memoria}", fg=self.colores['memoria'])
+        
+        self.historial_label.config(text=f"Historial: {len(self.historial)}")
     
     def click(self, caracter):
         if caracter == '=':
@@ -172,8 +269,170 @@ class CalculadoraModern:
             self.cambiar_signo()
         elif caracter == '%':
             self.porcentaje()
+        elif caracter in ['MC', 'MR', 'M+', 'M-', 'MS']:
+            self.manejar_memoria(caracter)
         else:
             self.agregar_numero(caracter)
+    
+    def manejar_memoria(self, operacion):
+        """Manejar operaciones de memoria"""
+        try:
+            valor_actual = float(self.texto_display) if self.texto_display not in ['Error', ''] else 0
+            
+            if operacion == 'MC':  # Memory Clear
+                self.memoria = 0
+                self.memoria_activa = False
+            
+            elif operacion == 'MR':  # Memory Recall
+                if self.memoria_activa:
+                    self.actualizar_display(str(self.memoria))
+                    self.nuevo_numero = True
+            
+            elif operacion == 'M+':  # Memory Add
+                self.memoria += valor_actual
+                self.memoria_activa = True
+                self.agregar_al_historial(f"M+ ({valor_actual})")
+            
+            elif operacion == 'M-':  # Memory Subtract
+                self.memoria -= valor_actual
+                self.memoria_activa = True
+                self.agregar_al_historial(f"M- ({valor_actual})")
+            
+            elif operacion == 'MS':  # Memory Store
+                self.memoria = valor_actual
+                self.memoria_activa = True
+                self.agregar_al_historial(f"MS ({valor_actual})")
+            
+            self.actualizar_memoria_display()
+            
+        except ValueError:
+            self.mostrar_error()
+    
+    def agregar_al_historial(self, operacion):
+        """Añadir operación al historial"""
+        self.historial.insert(0, operacion)
+        
+        # Limitar el tamaño del historial
+        if len(self.historial) > self.max_historial:
+            self.historial.pop()
+        
+        self.guardar_historial()
+        self.actualizar_memoria_display()
+    
+    def mostrar_historial(self):
+        """Mostrar ventana de historial"""
+        historial_window = tk.Toplevel(self.root)
+        historial_window.title("Historial de Operaciones")
+        historial_window.geometry("300x400")
+        historial_window.configure(bg='#2C2C2E')
+        historial_window.resizable(False, False)
+        
+        # Frame principal
+        main_frame = tk.Frame(historial_window, bg='#2C2C2E')
+        main_frame.pack(expand=True, fill='both', padx=10, pady=10)
+        
+        # Título
+        titulo = tk.Label(
+            main_frame,
+            text="📋 Historial de Operaciones",
+            font=('Helvetica', 16, 'bold'),
+            bg='#2C2C2E',
+            fg='#FFFFFF'
+        )
+        titulo.pack(pady=(0, 10))
+        
+        # Lista de historial
+        historial_frame = tk.Frame(main_frame, bg='#2C2C2E')
+        historial_frame.pack(expand=True, fill='both')
+        
+        if not self.historial:
+            vacio_label = tk.Label(
+                historial_frame,
+                text="El historial está vacío",
+                font=('Helvetica', 12),
+                bg='#2C2C2E',
+                fg='#888888'
+            )
+            vacio_label.pack(expand=True)
+        else:
+            # Scrollbar
+            scrollbar = tk.Scrollbar(historial_frame)
+            scrollbar.pack(side='right', fill='y')
+            
+            # Listbox para historial
+            listbox = tk.Listbox(
+                historial_frame,
+                bg='#3A3A3C',
+                fg='#FFFFFF',
+                font=('Helvetica', 11),
+                selectbackground='#4A90E2',
+                yscrollcommand=scrollbar.set
+            )
+            listbox.pack(expand=True, fill='both')
+            
+            scrollbar.config(command=listbox.yview)
+            
+            # Añadir items al listbox
+            for i, item in enumerate(self.historial):
+                listbox.insert('end', f"{i+1}. {item}")
+        
+        # Botones de acción
+        botones_frame = tk.Frame(main_frame, bg='#2C2C2E')
+        botones_frame.pack(fill='x', pady=(10, 0))
+        
+        tk.Button(
+            botones_frame,
+            text="Limpiar Historial",
+            font=('Helvetica', 12),
+            bg='#FF3B30',
+            fg='#FFFFFF',
+            bd=0,
+            relief='flat',
+            command=lambda: self.limpiar_historial(historial_window)
+        ).pack(side='left', padx=(0, 5))
+        
+        tk.Button(
+            botones_frame,
+            text="Cerrar",
+            font=('Helvetica', 12),
+            bg='#4A90E2',
+            fg='#FFFFFF',
+            bd=0,
+            relief='flat',
+            command=historial_window.destroy
+        ).pack(side='right')
+    
+    def limpiar_historial(self, ventana):
+        """Limpiar todo el historial"""
+        self.historial.clear()
+        self.guardar_historial()
+        self.actualizar_memoria_display()
+        ventana.destroy()
+        messagebox.showinfo("Historial", "Historial limpiado correctamente")
+    
+    def guardar_historial(self):
+        """Guardar historial en archivo"""
+        try:
+            with open('calculadora_historial.json', 'w') as f:
+                json.dump({
+                    'memoria': self.memoria,
+                    'historial': self.historial
+                }, f)
+        except:
+            pass
+    
+    def cargar_historial(self):
+        """Cargar historial desde archivo"""
+        try:
+            if os.path.exists('calculadora_historial.json'):
+                with open('calculadora_historial.json', 'r') as f:
+                    datos = json.load(f)
+                    self.memoria = datos.get('memoria', 0)
+                    self.historial = datos.get('historial', [])
+                    self.memoria_activa = (self.memoria != 0)
+        except:
+            self.memoria = 0
+            self.historial = []
     
     def agregar_numero(self, numero):
         actual = self.texto_display
@@ -225,12 +484,15 @@ class CalculadoraModern:
                     return
                 resultado = num1 / num2
             
-            # Formatear resultado (eliminar .0 si es entero)
+            # Guardar en historial
+            operacion_str = f"{num1} {self.ultima_operacion} {num2} = {resultado}"
+            self.agregar_al_historial(operacion_str)
+            
+            # Formatear resultado
             if resultado.is_integer():
                 texto_resultado = str(int(resultado))
             else:
                 texto_resultado = str(round(resultado, 8))
-                # Eliminar ceros decimales innecesarios
                 if '.' in texto_resultado:
                     texto_resultado = texto_resultado.rstrip('0').rstrip('.')
             
